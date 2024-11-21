@@ -34,7 +34,14 @@ sample_a6 = "Step 1: There were originally 9 computers. Step 2: For each of 4 da
 sample_a7 = "Step 1: Michael started with 58 golf balls. Step 2: After losing 23 on Tuesday, he had 58 - 23 = 35. Step 3: After losing 2 more, he had 35 - 2 = 33 golf balls. Step 4: The answer is 33. #### 33"
 sample_a8 = "Step 1: Olivia had 23 dollars. Step 2: 5 bagels for 3 dollars each will be 5 x 3 = 15 dollars. Step 3: So she has 23 - 15 dollars left. Step 4: 23 - 15 is 8. Step 5: The answer is 8. #### 8"
 
-prompt = (
+prompt_zeroshot = (
+"""For the following question, write a correct response with explaining your reasoning steps. 
+You must start step i with 'Step i:' and the last step must be the final answer and end generation there. 
+Let's think step by step.""" 
+)
+
+
+prompt_fewshot = (
 "Here are also examples of a mathematical question with the correct response."
 f"##Question: {sample_q1}\n"
 f"##Response: {sample_a1}\n\n"
@@ -71,7 +78,7 @@ with open(dataset_path, 'r') as infile, open(output_path, 'w') as outfile:
         question = data['query']
 
         sample = (
-            f"{prompt}"
+            f"{prompt_fewshot}"
             f"###Question: {question}\n"
             "##Response:"
         )

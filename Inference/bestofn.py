@@ -112,27 +112,49 @@ with open(dataset_path, 'r') as infile, open(output_path, 'w') as outfile:
         )
         
 
-
-        for i,dec_solution in enumerate(decoded_solutions):
-
+        prm_inputs = []
+        
+        for dec_solution in decoded_solutions:
             steps = dec_solution.split("####")[0].split("Step")
-
-            # Reconstruct the text by adding a special character after each step
             solution_for_prm = "".join([f"Step{step}{step_tag}\n" for step in steps if step.strip()])
+            prm_inputs.append(f"{question} {solution_for_prm}")
 
-            input_for_prm = f"{question} {solution_for_prm}"
+        # Tokenize PRM inputs in bulk
+        prm_input_ids = reward_tokenizer(prm_inputs, return_tensors="pt", padding=True, truncation=True).input_ids.to(f"cuda:{gpu_device}")
 
-            prm_input_id = torch.tensor([reward_tokenizer.encode(input_for_prm)]).to(f'cuda:{gpu_device}')
+        # Get PRM scores in batch
+        with torch.no_grad():
+            logits = reward_model(prm_input_ids).logits[:, :, candidate_tokens]
+            scores = logits.softmax(dim=-1)[:, :, 0]
+            step_mask = prm_input_ids == step_tag_id  # Mask for step tokens
+            step_scores = torch.where(step_mask, scores, torch.tensor(float("-inf"), device=scores.device))
+            avg_scores = step_scores.mean(dim=1)  # Average scores per solution
 
-            with torch.no_grad():
-                logits = reward_model(prm_input_id).logits[:,:,candidate_tokens]
-                scores = logits.softmax(dim=-1)[:,:,0] 
-                step_scores = scores[prm_input_id == step_tag_id]
-                avg_score = torch.mean(step_scores).item()
+        # Select the best solution
+        best_index = torch.argmax(avg_scores).item()
+        bestofn_solution = prm_inputs[best_index]
 
-                if avg_score > max_avg_score:
-                    max_avg_score = avg_score
-                    bestofn_solution = solution_for_prm
+
+        # for i,dec_solution in enumerate(decoded_solutions):
+
+        #     steps = dec_solution.split("####")[0].split("Step")
+
+        #     # Reconstruct the text by adding a special character after each step
+        #     solution_for_prm = "".join([f"Step{step}{step_tag}\n" for step in steps if step.strip()])
+
+        #     input_for_prm = f"{question} {solution_for_prm}"
+
+        #     prm_input_id = torch.tensor([reward_tokenizer.encode(input_for_prm)]).to(f'cuda:{gpu_device}')
+
+        #     with torch.no_grad():
+        #         logits = reward_model(prm_input_id).logits[:,:,candidate_tokens]
+        #         scores = logits.softmax(dim=-1)[:,:,0] 
+        #         step_scores = scores[prm_input_id == step_tag_id]
+        #         avg_score = torch.mean(step_scores).item()
+
+        #         if avg_score > max_avg_score:
+        #             max_avg_score = avg_score
+        #             bestofn_solution = solution_for_prm
         
         
         output_data = {
